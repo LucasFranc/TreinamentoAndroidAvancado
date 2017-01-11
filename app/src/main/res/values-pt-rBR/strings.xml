@@ -5,5 +5,6 @@
     <string name="username">Usuário</string>
     <string name="password">Senha</string>
     <string name="login">Entrar</string>
+    <string name="call">Ligar</string>
 
 </resources>

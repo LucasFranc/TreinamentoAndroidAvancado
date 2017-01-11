@@ -1,6 +1,15 @@
 <resources>
+
+    <string name="oauth_client_id">ac152a3096c74cb39174</string>
+    <string name="oauth_client_secret">76458235eb1f7e7cd0197210d28691ebbd6143de</string>
+    <string name="oauth_host">brainmachine.io</string>
+    <string name="oauth_schema">http</string>
+
     <string name="app_name">TreinamentoMonitoraRetrofit</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="login">Login</string>
+    <string name="sp_file">br.com.monitoratec.FILE_PREFERENCES</string>
+    <string name="sp_credential">CREDENTIAL_SHARED</string>
+    <string name="call">Call</string>
 </resources>

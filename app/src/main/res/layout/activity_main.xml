@@ -62,5 +62,11 @@
             android:layout_height="wrap_content"
             android:text="@string/login"/>
 
+        <android.support.v7.widget.AppCompatButton
+            android:id="@+id/btn_loginOauth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="OauthLogin"/>
+
     </LinearLayout>
 </RelativeLayout>
