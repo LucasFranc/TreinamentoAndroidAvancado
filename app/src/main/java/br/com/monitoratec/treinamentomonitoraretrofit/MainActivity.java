@@ -1,10 +1,8 @@
 package br.com.monitoratec.treinamentomonitoraretrofit;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
-import android.graphics.PorterDuff;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TextInputLayout;
@@ -13,22 +11,17 @@ import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.AppCompatButton;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.jakewharton.rxbinding.view.RxView;
 import com.jakewharton.rxbinding.widget.RxTextView;
 
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
+import javax.inject.Inject;
+import javax.inject.Named;
 
 import br.com.monitoratec.treinamentomonitoraretrofit.entity.AccessToken;
 import br.com.monitoratec.treinamentomonitoraretrofit.entity.GitHubApi;
@@ -39,18 +32,13 @@ import br.com.monitoratec.treinamentomonitoraretrofit.entity.User;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import dagger.Lazy;
 import okhttp3.Credentials;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
-import rx.Subscriber;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.schedulers.Schedulers;
 
-public class MainActivity extends AppCompatActivity{
+public class MainActivity extends BaseActivity{
 
     @BindView(R.id.txt_status)                  TextView txtStatus;
     @BindView(R.id.ic_github)                   ImageView imgGitHub;
@@ -61,10 +49,19 @@ public class MainActivity extends AppCompatActivity{
 
 
     private static final String TAG = MainActivity.class.getSimpleName();
-    private GitHubStatusApi statusApiImpl;
-    private GitHubApi ApiImpl;
-    private SharedPreferences sharedPreferences;
-    private GitHubOauthApi gitHubOauthApi;
+
+    @Inject
+    GitHubStatusApi statusApiImpl;
+    @Inject
+    Lazy<GitHubApi> apiImpl; //Lazy espera o objeto ser usado para instacia-lo "fica em hold"
+    @Inject
+    Lazy<GitHubOauthApi> gitHubOauthApi;
+    @Inject
+    LocationManager locationManager;
+
+    @Inject
+    @Named("secret")
+    SharedPreferences sharedPreferences;
 
 
     @OnClick(R.id.btn_login)
@@ -97,7 +94,7 @@ public class MainActivity extends AppCompatActivity{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-
+        super.getDaggerDiComponent().inject(this);
         btnOauth.setOnClickListener(v -> {
             final String baseUrl = GitHubOauthApi.BASE_URL + "authorize";
             final String clientId = getString(R.string.oauth_client_id);
@@ -108,8 +105,6 @@ public class MainActivity extends AppCompatActivity{
         });
 
         statusApiImpl = GitHubStatusApi.RETROFIT.create(GitHubStatusApi.class);
-        ApiImpl = GitHubApi.RETROFIT.create(GitHubApi.class);
-        gitHubOauthApi = GitHubOauthApi.RETROFIT.create(GitHubOauthApi.class);
         sharedPreferences = getSharedPreferences(getString(R.string.sp_file), MODE_PRIVATE);
         Subscription subscribe = RxTextView.textChanges(txtUsername.getEditText())
                 .skip(1) //ignora primeira vez
@@ -132,7 +127,7 @@ public class MainActivity extends AppCompatActivity{
             if (code != null) {
             String clientId = getString(R.string.oauth_client_id);
                 String clientSecret = getString(R.string.oauth_client_secret);
-                gitHubOauthApi.accessToken(clientId,clientSecret,code)
+                gitHubOauthApi.get().accessToken(clientId,clientSecret,code)
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(new MySubscriber<AccessToken>() {
@@ -164,7 +159,7 @@ public class MainActivity extends AppCompatActivity{
         String username = txtUsername.getEditText().getText().toString();
         String password = txtPassword.getEditText().getText().toString();
         final String credential = Credentials.basic(username, password);
-        ApiImpl.basicAuth(credential)
+        apiImpl.get().basicAuth(credential)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new MySubscriber<User>() {
