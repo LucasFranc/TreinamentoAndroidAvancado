@@ -24,8 +24,11 @@ import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.jakewharton.rxbinding.view.RxView;
+import com.jakewharton.rxbinding.widget.RxTextView;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import br.com.monitoratec.treinamentomonitoraretrofit.entity.AccessToken;
 import br.com.monitoratec.treinamentomonitoraretrofit.entity.GitHubApi;
@@ -42,6 +45,10 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
+import rx.Subscriber;
+import rx.Subscription;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 public class MainActivity extends AppCompatActivity{
 
@@ -104,7 +111,17 @@ public class MainActivity extends AppCompatActivity{
         ApiImpl = GitHubApi.RETROFIT.create(GitHubApi.class);
         gitHubOauthApi = GitHubOauthApi.RETROFIT.create(GitHubOauthApi.class);
         sharedPreferences = getSharedPreferences(getString(R.string.sp_file), MODE_PRIVATE);
-
+        Subscription subscribe = RxTextView.textChanges(txtUsername.getEditText())
+                .skip(1) //ignora primeira vez
+                /*.debounce(2, TimeUnit.SECONDS).observeOn(MainThread()) VALIDA EM 2 SEGUNDOS */
+                .subscribe(charSequence -> {
+                    AppUtils.checkFilledFields(this, txtUsername);
+                });
+        /*subscribe.unsubscribe(); PARAR O TEXTWATCHER*/
+        /*RxView.clicks(btnOauth).subscribe(aVoid -> { "OnClickListener"
+            processOAuthRedirectUri();
+        });
+*/
     }
 
     private void processOAuthRedirectUri() {
@@ -115,28 +132,25 @@ public class MainActivity extends AppCompatActivity{
             if (code != null) {
             String clientId = getString(R.string.oauth_client_id);
                 String clientSecret = getString(R.string.oauth_client_secret);
-                gitHubOauthApi.accessToken(clientId,clientSecret,code).enqueue(new Callback<AccessToken>() {
-                    @Override
-                    public void onResponse(Call<AccessToken> call, Response<AccessToken> response) {
-                        if(response.isSuccessful()){
-                            AccessToken accessToken = response.body();
-                            String credentialKey = getString(R.string.sp_credential);
-                            sharedPreferences.edit().putString(credentialKey,accessToken.getAuthCredential()).apply();
-                            Snackbar.make(btnOauth,accessToken.access_token,Snackbar.LENGTH_LONG).show();
-                        }
-                    }
+                gitHubOauthApi.accessToken(clientId,clientSecret,code)
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new MySubscriber<AccessToken>() {
+                            @Override
+                            public void onNext(AccessToken accessToken) {
+                                String credentialKey = getString(R.string.sp_credential);
+                                sharedPreferences.edit().putString(credentialKey,accessToken.getAuthCredential()).apply();
+                                Snackbar.make(btnOauth,accessToken.access_token,Snackbar.LENGTH_LONG).show();
+                            }
 
-                    @Override
-                    public void onFailure(Call<AccessToken> call, Throwable t) {
+                            @Override
+                            public void onError(String message) {
+                                Snackbar.make(btnOauth,message,Snackbar.LENGTH_LONG).show();
+                            }
+                        });
 
-                    }
-                });
-
-            } else if (uri.getQueryParameter("error") != null) {
-                //TODO Tratar erro
+                getIntent().setData(null);
             }
-            // Limpar os dados para evitar chamadas múltiplas
-            getIntent().setData(null);
         }
     }
 
@@ -149,24 +163,25 @@ public class MainActivity extends AppCompatActivity{
 
         String username = txtUsername.getEditText().getText().toString();
         String password = txtPassword.getEditText().getText().toString();
-        final String credential = Credentials.basic(username,password);
-        ApiImpl.basicAuth(credential).enqueue(new Callback<User>() {
-            @Override
-            public void onResponse(Call<User> call, Response<User> response) {
-                if(response.isSuccessful()){
-                    sharedPreferences.edit().putString(getString(R.string.sp_credential),credential).apply();
-                    sharedPreferences.getString(getString(R.string.sp_credential),"");
-                    Snackbar.make(view,response.body().getLogin(),Snackbar.LENGTH_LONG).show();
-                }
-            }
+        final String credential = Credentials.basic(username, password);
+        ApiImpl.basicAuth(credential)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new MySubscriber<User>() {
 
-            @Override
-            public void onFailure(Call<User> call, Throwable t) {
-                Log.e(TAG,"erro");
-            }
-        });
+                    @Override
+                    public void onError(String message) {
+
+                    }
+
+                    @Override
+                    public void onNext(User user) {
+                        sharedPreferences.edit().putString(getString(R.string.sp_credential), credential).apply();
+                        sharedPreferences.getString(getString(R.string.sp_credential), "");
+                        Snackbar.make(view, user.getLogin(), Snackbar.LENGTH_LONG).show();
+                    }
+                });
     }
-
     @Override
     protected void onResume() {
         super.onResume();
@@ -184,33 +199,26 @@ public class MainActivity extends AppCompatActivity{
         }*/
 
         //ASSINCRONO
-        statusApiImpl.lastMessage().enqueue(new Callback<Status>() {
-            @Override
-            public void onResponse(Call<Status> call, Response<Status> response) {
-                if(response.isSuccessful()){
-                    Status status = response.body();
-                    setColors(status.getType().getColorRes() , status.getBody());
-                }else{
-                    try {
-                        String errorBody = response.errorBody().string();
-                        setColors(Status.Type.MAJOR.getColorRes(),errorBody);
-                    } catch (IOException e) {
-                        Log.e(TAG,e.toString(),e);
+        statusApiImpl.lastMessage()
+                .subscribeOn(Schedulers.io()) //new thread
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new MySubscriber<Status>() {
+                    @Override
+                    public void onError(String message) {
+                        setColors(Status.Type.MAJOR);
                     }
 
-                }
-            }
-
-            @Override
-            public void onFailure(Call<Status> call, Throwable t) {
-                setColors(Status.Type.MAJOR.getColorRes(),call.toString());
-            }
-        });
+                    @Override
+                    public void onNext(Status status) {
+                        setColors(status.getType());
+                    }
+                });
     }
 
-    private void setColors(int colorRes, String msg) {
-        txtStatus.setText(msg);
-        int color = ContextCompat.getColor(MainActivity.this,colorRes);
+
+    private void setColors(Status.Type status) {
+        txtStatus.setText(getString(status.getMessageRes()));
+        int color = ContextCompat.getColor(MainActivity.this,status.getColorRes());
         txtStatus.setTextColor(color); //Setar cor
         DrawableCompat.setTint(imgGitHub.getDrawable(),color); //set tint compat!
 

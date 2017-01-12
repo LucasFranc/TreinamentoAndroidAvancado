@@ -20,23 +20,25 @@ public class Status {
     private String created_on;
 
     public enum Type{
+        NONE(R.color.colorPrimaryDark,R.string.loading),
         @SerializedName("good")
-        GOOD(R.color.green),
+        GOOD(R.color.green, R.string.good),
         @SerializedName("minor")
-        MINOR(R.color.orange),
+        MINOR(R.color.orange, R.string.minor),
         @SerializedName("major")
-        MAJOR(R.color.red);
+        MAJOR(R.color.red, R.string.major);
 
         private int colorRes;
+        private int messageRes;
 
-        Type(int colorRes) {
+        Type(int colorRes, int messageRes) {
             this.colorRes = colorRes;
+            this.messageRes = messageRes;
         }
-
         public int getColorRes(){
             return colorRes;
         }
-
+        public int getMessageRes() {return messageRes;}
     }
 
     public Type getType() {

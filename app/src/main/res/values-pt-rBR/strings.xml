@@ -6,5 +6,9 @@
     <string name="password">Senha</string>
     <string name="login">Entrar</string>
     <string name="call">Ligar</string>
+    <string name="loading">Carregando...</string>
+    <string name="good">OKAY</string>
+    <string name="minor">ALERTA</string>
+    <string name="major">ERRO</string>
 
 </resources>
